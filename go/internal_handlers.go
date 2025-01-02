@@ -25,7 +25,7 @@ func internalGetMatching(w http.ResponseWriter, r *http.Request) {
 		if err := db.GetContext(ctx, matched, `
 			SELECT c.* FROM chairs c
 			INNER JOIN (
-				SELECT chair_id, MAX(created_at) as latest
+				SELECT chair_id, latitude, longitude, MAX(created_at) as latest
 				FROM chair_locations
 				GROUP BY chair_id
 			) latest_cl ON c.id = latest_cl.chair_id
