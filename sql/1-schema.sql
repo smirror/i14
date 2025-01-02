@@ -111,8 +111,6 @@ CREATE TABLE ride_statuses
 )
   COMMENT = 'ライドステータスの変更履歴テーブル';
 
-CREATE INDEX idx_ride_id_created_at ON ride_statuses (ride_id, created_at DESC);
-
 DROP TABLE IF EXISTS owners;
 CREATE TABLE owners
 (
