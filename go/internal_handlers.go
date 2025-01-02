@@ -29,8 +29,9 @@ func internalGetMatching(w http.ResponseWriter, r *http.Request) {
 				FROM chair_locations
 				GROUP BY chair_id
 			) latest_cl ON c.id = latest_cl.chair_id
+			INNER JOIN chair_locations cl ON latest_cl.chair_id = cl.chair_id AND latest_cl.latest = cl.created_at
 			WHERE c.is_active = TRUE
-			ORDER BY ABS(latest_cl.latitude - ?) + ABS(latest_cl.longitude - ?)
+			ORDER BY ABS(cl.latitude - ?) + ABS(cl.longitude - ?)
 			LIMIT 1
 		`, ride.PickupLatitude, ride.PickupLongitude); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
