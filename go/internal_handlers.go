@@ -71,7 +71,7 @@ func findNearestChair(ctx context.Context, tx *sql.Tx, ride *Ride, minLat, maxLa
 }
 
 // graduallyExpandSearch expands the search range to find the nearest available chair
-func graduallyExpandSearch(ctx context.Context, tx *sql.Tx, ride *Ride, maxDistance, stepDistance float64) (*ChairWithDistance, error) {
+func graduallyExpandSearch(ctx context.Context, tx *sql.Tx, ride *Ride, maxDistance, stepDistance int) (*ChairWithDistance, error) {
 	currentDistance := stepDistance
 	for currentDistance <= maxDistance {
 		// バウンディングボックスを計算
@@ -142,8 +142,8 @@ func internalGetMatching(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 徐々に距離を広げて椅子を検索
-	maxDistance := 150.0 // 最大距離 (km)
-	stepDistance := 25.0 // 段階距離 (km)
+	maxDistance := 150 // 最大距離 (km)
+	stepDistance := 25 // 段階距離 (km)
 	chair, err := graduallyExpandSearch(ctx, txl, ride, maxDistance, stepDistance)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
