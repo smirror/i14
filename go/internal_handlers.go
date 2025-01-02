@@ -94,6 +94,16 @@ func graduallyExpandSearch(ctx context.Context, tx *sql.Tx, ride *Ride, maxDista
 	return nil, nil // 見つからなかった場合
 }
 
+// バウンディングボックスを計算するヘルパー関数
+func calculateBoundingBox(lat, lng, distance int) (minLat, maxLat, minLng, maxLng int) {
+	minLat = lat - distance
+	maxLat = lat + distance
+	minLng = lng - distance
+	maxLng = lng + distance
+
+	return
+}
+
 // internalGetMatching matches rides with available chairs
 func internalGetMatching(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
