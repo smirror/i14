@@ -5,27 +5,46 @@ import (
 	"database/sql"
 	"errors"
 	"log"
+	"math"
 	"net/http"
 	"time"
 )
 
 // Chair represents a chair entity from the database
-type ChairEntity struct {
+type Chair struct {
 	ID        string
-	Latitude  int
-	Longitude int
+	Latitude  float64
+	Longitude float64
 }
 
 // ChairWithDistance represents a chair with precomputed distance
 type ChairWithDistance struct {
 	ID        string
-	Latitude  int
-	Longitude int
-	Distance  int
+	Latitude  float64
+	Longitude float64
+	Distance  float64
+}
+
+// calculateDistance calculates the Haversine distance between two points
+func calculateDistance(lat1, lng1, lat2, lng2 float64) float64 {
+	const earthRadius = 6371.0 // Radius of the Earth in kilometers
+	lat1Rad := lat1 * math.Pi / 180
+	lng1Rad := lng1 * math.Pi / 180
+	lat2Rad := lat2 * math.Pi / 180
+	lng2Rad := lng2 * math.Pi / 180
+
+	dLat := lat2Rad - lat1Rad
+	dLng := lng2Rad - lng1Rad
+
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1Rad)*math.Cos(lat2Rad)*math.Sin(dLng/2)*math.Sin(dLng/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+
+	return earthRadius * c
 }
 
 // findNearestChair searches for the nearest available chair in the bounding box
-func findNearestChair(ctx context.Context, tx *sql.Tx, ride *Ride, minLat, maxLat, minLng, maxLng int) (*ChairWithDistance, error) {
+func findNearestChair(ctx context.Context, tx *sql.Tx, ride *Ride, minLat, maxLat, minLng, maxLng float64) (*ChairWithDistance, error) {
 	// 椅子を検索
 	rows, err := tx.QueryContext(ctx, `
 		SELECT chairs.id, chair_locations.latitude, chair_locations.longitude
@@ -44,7 +63,7 @@ func findNearestChair(ctx context.Context, tx *sql.Tx, ride *Ride, minLat, maxLa
 	// Goで距離を計算
 	var nearestChair *ChairWithDistance
 	for rows.Next() {
-		chair := ChairEntity{}
+		chair := Chair{}
 		if err := rows.Scan(&chair.ID, &chair.Latitude, &chair.Longitude); err != nil {
 			return nil, err
 		}
