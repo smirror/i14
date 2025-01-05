@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
-
+	"sync"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -190,44 +190,84 @@ type ownerGetChairResponseChair struct {
 	TotalDistanceUpdatedAt *int64 `json:"total_distance_updated_at,omitempty"`
 }
 
+type CacheItem struct {
+	Value     int
+}
+var totalDistanceCache sync.Map
+
+type chairID struct {
+	ID                     string       `db:"id"`
+}
+
 func ownerGetChairs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	owner := ctx.Value("owner").(*Owner)
 
+	// キャッシュから取得
+	// まずはownerが所有する椅子すべてを取得し、キャッシュに存在するか確認
+	// キャッシュに存在する場合は、キャッシュから取得し、存在しない場合はDBから取得
+	chairIds := []chairID{}
+	if err := db.SelectContext(ctx, &chairIds, `SELECT id FROM Id WHERE owner_id = ?`, owner.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	// totalDistance をキャッシュから取得する
+	totalDistanceMap := map[string]int{}
+	for _, chair := range chairIds {
+		if item, ok := totalDistanceCache.Load(chair.ID); ok {
+			totalDistanceMap[chair.ID] = item.(CacheItem).Value
+		} else {
+			// キャッシュが存在しない場合はDBから取得
+			var totalDistance sql.NullInt64
+			if err := db.GetContext(ctx, &totalDistance, `
+			SELECT
+				IFNULL(
+					SUM(ABS(latitude - LAG(latitude) OVER(PARTITION BY chair_id ORDER BY created_at)) + ABS(longitude - LAG(longitude) OVER(PARTITION BY chair_id ORDER BY created_at)), 0) AS total_distance
+					FROM
+						chair_locations
+						WHERE
+							chair_id = ?`, chair.ID); err != nil {
+				writeError(w, http.StatusInternalServerError, err)
+				return
+			}
+			if totalDistance.Valid {
+				totalDistanceMap[chair.ID] = int(totalDistance.Int64)
+			} else {
+				totalDistanceMap[chair.ID] = 0
+			}
+
+			totalDistanceCache.Store(chair.ID, CacheItem{Value: totalDistanceMap[chair.ID]})
+		}
+	}
+
 	chairs := []chairWithDetail{}
-	if err := db.SelectContext(ctx, &chairs, `WITH distance_calculation AS (
-  SELECT
-      chair_id,
-      created_at,
-      ABS(latitude - LAG(latitude) OVER (PARTITION BY chair_id ORDER BY created_at)) +
-      ABS(longitude - LAG(longitude) OVER (PARTITION BY chair_id ORDER BY created_at)) AS distance
-  FROM chair_locations
-),
-aggregated_distances AS (
-  SELECT
-      chair_id,
-      SUM(IFNULL(distance, 0)) AS total_distance,
-      MAX(created_at) AS total_distance_updated_at
-  FROM distance_calculation
-  GROUP BY chair_id
-)
-SELECT
-  c.id,
-  c.owner_id,
-  c.name,
-  c.access_token,
-  c.model,
-  c.is_active,
-  c.created_at,
-  c.updated_at,
-  IFNULL(ad.total_distance, 0) AS total_distance,
-  ad.total_distance_updated_at
-FROM
-  chairs c
-LEFT JOIN
-  aggregated_distances ad ON c.id = ad.chair_id
-WHERE
-  c.owner_id = ?
+	if err := db.SelectContext(ctx, &chairs, `WITH aggregated_distances AS(
+			SELECT
+				chair_id,
+				MAX(created_at) AS latest_distance_update
+			FROM
+				chair_locations
+			GROUP BY
+				chair_id
+		)
+		SELECT
+			c.id,
+			c.owner_id,
+			c.name,
+			c.access_token,
+			c.model,
+			c.is_active,
+			c.created_at,
+			c.updated_at,
+			ad.latest_distance_update
+		FROM
+			chairs c
+			LEFT JOIN
+				aggregated_distances ad
+			ON	c.id = ad.chair_id
+		WHERE
+			c.owner_id = ?
 `, owner.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -241,7 +281,7 @@ WHERE
 			Model:         chair.Model,
 			Active:        chair.IsActive,
 			RegisteredAt:  chair.CreatedAt.UnixMilli(),
-			TotalDistance: chair.TotalDistance,
+			TotalDistance: totalDistanceMap[chair.ID],
 		}
 		if chair.TotalDistanceUpdatedAt.Valid {
 			t := chair.TotalDistanceUpdatedAt.Time.UnixMilli()
