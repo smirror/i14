@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/oklog/ulid/v2"
 )
@@ -142,7 +143,7 @@ func chairPostCoordinate(w http.ResponseWriter, r *http.Request) {
 		travelDistance = abs(prevChair.Latitude-req.Latitude) + abs(prevChair.Longitude-req.Longitude)
 	}
 	totalDistance += travelDistance
-	totalDistanceCache.Store(chair.ID, CacheItem{Value: totalDistance})
+	totalDistanceCache.Store(chair.ID, CacheItem{Value: totalDistance, ExpiresAt: time.Now().Add(30 * time.Second)})
 
 	location := &ChairLocation{}
 	if err := tx.GetContext(ctx, location, `SELECT * FROM chair_locations WHERE id = ?`, chairLocationID); err != nil {

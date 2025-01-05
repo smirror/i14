@@ -192,6 +192,7 @@ type ownerGetChairResponseChair struct {
 
 type CacheItem struct {
 	Value     int
+	ExpiresAt time.Time
 }
 var totalDistanceCache sync.Map
 
@@ -216,8 +217,33 @@ func ownerGetChairs(w http.ResponseWriter, r *http.Request) {
 	totalDistanceMap := map[string]int{}
 	for _, chair := range chairIds {
 		if item, ok := totalDistanceCache.Load(chair.ID); ok {
-			totalDistanceMap[chair.ID] = item.(CacheItem).Value
+			cached := item.(CacheItem)
+			if time.Now().Before(cached.ExpiresAt) {
+				totalDistanceMap[chair.ID] = cached.Value
+			} else {
+				// キャッシュが期限切れの場合はDBから取得
+				var totalDistance sql.NullInt64
+				if err := db.GetContext(ctx, &totalDistance, `
+				SELECT
+					IFNULL(
+						SUM(ABS(latitude - LAG(latitude) OVER(PARTITION BY chair_id ORDER BY created_at)) + ABS(longitude - LAG(longitude) OVER(PARTITION BY chair_id ORDER BY created_at)), 0) AS total_distance
+						FROM
+							chair_locations
+							WHERE
+								chair_id = ?`, chair.ID); err != nil {
+					writeError(w, http.StatusInternalServerError, err)
+					return
+				}
+				if totalDistance.Valid {
+					totalDistanceMap[chair.ID] = int(totalDistance.Int64)
+				} else {
+					totalDistanceMap[chair.ID] = 0
+				}
+
+				totalDistanceCache.Store(chair.ID, CacheItem{Value: totalDistanceMap[chair.ID]})
+			}
 		} else {
+			// TODO: DRY にする
 			// キャッシュが存在しない場合はDBから取得
 			var totalDistance sql.NullInt64
 			if err := db.GetContext(ctx, &totalDistance, `
