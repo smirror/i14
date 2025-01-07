@@ -240,7 +240,7 @@ func ownerGetChairs(w http.ResponseWriter, r *http.Request) {
 					totalDistanceMap[chair.ID] = 0
 				}
 
-				totalDistanceCache.Store(chair.ID, CacheItem{Value: totalDistanceMap[chair.ID], ExpiresAt: time.Now().Add(30 * time.Second)})
+				totalDistanceCache.Store(chair.ID, CacheItem{Value: totalDistanceMap[chair.ID]})
 			}
 		} else {
 			// TODO: DRY にする
@@ -263,7 +263,7 @@ func ownerGetChairs(w http.ResponseWriter, r *http.Request) {
 				totalDistanceMap[chair.ID] = 0
 			}
 
-			totalDistanceCache.Store(chair.ID, CacheItem{Value: totalDistanceMap[chair.ID], ExpiresAt: time.Now().Add(30 * time.Second)})
+			totalDistanceCache.Store(chair.ID, CacheItem{Value: totalDistanceMap[chair.ID]})
 		}
 	}
 
