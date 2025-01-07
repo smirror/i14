@@ -111,13 +111,6 @@ func chairPostCoordinate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	// 1つ前の座標を取得
-	prevChair := &ChairLocation{}
-	if err := tx.GetContext(ctx, prevChair, "SELECT * FROM chairs WHERE id = ? ORDER BY created_at DESC LIMIT 1", chair.ID); err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-
 	chairLocationID := ulid.Make().String()
 	if _, err := tx.ExecContext(
 		ctx,
@@ -127,22 +120,6 @@ func chairPostCoordinate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-
-	totalDistance := 0
-	if item, ok := totalDistanceCache.Load(chair.ID); ok {
-		totalDistance = item.(CacheItem).Value
-	} else {
-		totalDistance = 0
-	}
-
-	// 移動距離を計算
-	// マンハッタン距離なので、緯度経度の差分の絶対値を足し合わせる
-	travelDistance := 0
-	if prevChair.ID != "" {
-		travelDistance = abs(prevChair.Latitude-req.Latitude) + abs(prevChair.Longitude-req.Longitude)
-	}
-	totalDistance += travelDistance
-	totalDistanceCache.Store(chair.ID, CacheItem{Value: totalDistance})
 
 	location := &ChairLocation{}
 	if err := tx.GetContext(ctx, location, `SELECT * FROM chair_locations WHERE id = ?`, chairLocationID); err != nil {
