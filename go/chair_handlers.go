@@ -129,7 +129,7 @@ func chairPostCoordinate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// chairsテーブルのtotal_distanceを更新
-	if _, err := tx.ExecContext(ctx, "UPDATE chairs SET total_distance = total_distance + ? WHERE id = ?", calculateDistance(req.Latitude, req.Longitude, prevLocation.Latitude, prevLocation.Longitude), chair.ID); err != nil {
+	if _, err := tx.ExecContext(ctx, "UPDATE chairs SET total_distance = ? WHERE id = ?", calculateDistance(req.Latitude, req.Longitude, prevLocation.Latitude, prevLocation.Longitude), chair.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
