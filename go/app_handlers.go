@@ -887,22 +887,23 @@ func appGetNearbyChairs(w http.ResponseWriter, r *http.Request) {
 		`
 WITH latest_chair_locations AS (
     SELECT cl.*
-    FROM chair_locations cl
-    WHERE cl.created_at = (
-        SELECT MAX(cl_inner.created_at)
-        FROM chair_locations cl_inner
+    FROM (
+        SELECT cl.*, ROW_NUMBER() OVER (PARTITION BY cl.chair_id ORDER BY cl.created_at DESC) AS rn
+        FROM chair_locations cl
         WHERE cl_inner.chair_id = cl.chair_id
-    )
+    ) cl
+    WHERE cl.rn = 1
     AND ABS(cl.latitude - :lat) + ABS(cl.longitude - :lon) < :distance
 ),
 latest_ride_statuses AS (
     SELECT rs.ride_id, rs.status
-    FROM ride_statuses rs
-    WHERE rs.created_at = (
-        SELECT MAX(rs_inner.created_at)
-        FROM ride_statuses rs_inner
-        WHERE rs_inner.ride_id = rs.ride_id
-    )
+    FROM (
+        SELECT rides.*, ride_statuses.status, ROW_NUMBER() OVER (PARTITION BY ride_id ORDER BY ride_statuses.created_at DESC) AS rn
+        FROM rides
+		LEFT JOIN ride_statuses ON rides.id = ride_statuses.ride_id
+    ) r
+	WHERE r.rn = 1
+    AND r.ride_statuses.status = 'COMPLETED'
 )
 SELECT 
     c.id, 
