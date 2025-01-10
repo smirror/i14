@@ -37,7 +37,6 @@ CREATE TABLE chairs
   COMMENT = '椅子情報テーブル';
 
 CREATE INDEX idx_owner_id ON chairs (owner_id);
-CREATE INDEX idx_access_token ON chairs (access_token);
 
 DROP TABLE IF EXISTS chair_locations;
 CREATE TABLE chair_locations
@@ -98,9 +97,6 @@ CREATE TABLE rides
   PRIMARY KEY (id)
 )
   COMMENT = 'ライド情報テーブル';
-
-CREATE INDEX idx_chair_id_updated_at ON rides (chair_id, updated_at);
-CREATE INDEX idx_user_id_created_at ON rides (user_id, created_at);
 
 DROP TABLE IF EXISTS ride_statuses;
 CREATE TABLE ride_statuses
