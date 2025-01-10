@@ -862,8 +862,6 @@ func appGetNearbyChairs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	coordinate := Coordinate{Latitude: lat, Longitude: lon}
-
 	tx, err := db.Beginx()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
@@ -893,7 +891,7 @@ WITH latest_chair_locations AS (
         WHERE cl_inner.chair_id = cl.chair_id
     ) cl
     WHERE cl.rn = 1
-    AND ABS(cl.latitude - :lat) + ABS(cl.longitude - :lon) < :distance
+    AND ABS(cl.latitude - ?) + ABS(cl.longitude - ?) < ?
 ),
 latest_ride_statuses AS (
     SELECT rs.ride_id, rs.status
@@ -922,19 +920,14 @@ LEFT JOIN
 WHERE 
     (rs.status = 'COMPLETED' OR rs.status IS NULL)
     AND c.is_active
-    `,
-		map[string]interface{}{
-			"lat":      coordinate.Latitude,
-			"lon":      coordinate.Longitude,
-			"distance": distance,
-		},
+    `, lat, lon, distance,
 	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	nearbyChairs := []appGetNearbyChairsResponseChair{}
+	nearbyChairs := make([]appGetNearbyChairsResponseChair{}, 0, len(chairsWithDetails))
 	for _, chair := range chairsWithDetails {
 		nearbyChairs = append(nearbyChairs, appGetNearbyChairsResponseChair{
 			ID:    chair.ChairID,
