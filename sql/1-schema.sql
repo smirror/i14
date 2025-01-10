@@ -29,7 +29,7 @@ CREATE TABLE chairs
   name         VARCHAR(30)  NOT NULL COMMENT '椅子の名前',
   model        TEXT         NOT NULL COMMENT '椅子のモデル',
   is_active    TINYINT(1)   NOT NULL COMMENT '配椅子受付中かどうか',
-  total_distance INTEGER    NOT NULL DEFAULT 0 COMMENT '総移動距離',
+  total_distance INTEGER    DEFAULT 0 COMMENT '総移動距離',
   access_token VARCHAR(255) NOT NULL COMMENT 'アクセストークン',
   created_at   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '登録日時',
   updated_at   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '更新日時',
