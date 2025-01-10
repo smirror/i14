@@ -927,7 +927,7 @@ WHERE
 		return
 	}
 
-	nearbyChairs := make([]appGetNearbyChairsResponseChair{}, 0, len(chairsWithDetails))
+	nearbyChairs := make([]appGetNearbyChairsResponseChair, 0, len(chairsWithDetails))
 	for _, chair := range chairsWithDetails {
 		nearbyChairs = append(nearbyChairs, appGetNearbyChairsResponseChair{
 			ID:    chair.ChairID,
