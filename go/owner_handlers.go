@@ -195,39 +195,39 @@ func ownerGetChairs(w http.ResponseWriter, r *http.Request) {
 	owner := ctx.Value("owner").(*Owner)
 
 	chairs := []chairWithDetail{}
-	if err := db.SelectContext(ctx, &chairs, `WITH distance_calculation AS (
-  SELECT
-      chair_id,
-      created_at,
-      ABS(latitude - LAG(latitude) OVER (PARTITION BY chair_id ORDER BY created_at)) +
-      ABS(longitude - LAG(longitude) OVER (PARTITION BY chair_id ORDER BY created_at)) AS distance
-  FROM chair_locations
-),
-aggregated_distances AS (
-  SELECT
-      chair_id,
-      SUM(IFNULL(distance, 0)) AS total_distance,
-      MAX(created_at) AS total_distance_updated_at
-  FROM distance_calculation
-  GROUP BY chair_id
-)
-SELECT
-  c.id,
-  c.owner_id,
-  c.name,
-  c.access_token,
-  c.model,
-  c.is_active,
-  c.created_at,
-  c.updated_at,
-  IFNULL(ad.total_distance, 0) AS total_distance,
-  ad.total_distance_updated_at
-FROM
-  chairs c
-LEFT JOIN
-  aggregated_distances ad ON c.id = ad.chair_id
-WHERE
-  c.owner_id = ?
+	if err := db.SelectContext(ctx, &chairs, `
+	 WITH filtered_chairs AS (
+     SELECT id
+     FROM chairs
+     WHERE owner_id = ?
+ )
+ SELECT c.id,
+        c.owner_id,
+        c.name,
+        c.access_token,
+        c.model,
+        c.is_active,
+        c.created_at,
+        c.updated_at,
+        ifnull(dt.total_distance, 0) AS total_distance,
+        dt.total_distance_updated_at
+ FROM filtered_chairs fc
+ JOIN chairs c ON fc.id = c.id
+ LEFT JOIN (
+     SELECT chair_id,
+            SUM(distance) AS total_distance,
+            MAX(created_at) AS total_distance_updated_at
+     FROM (
+         SELECT cl.chair_id,
+                cl.created_at,
+                abs(cl.latitude - lag(cl.latitude) OVER (PARTITION BY cl.chair_id ORDER BY cl.created_at)) +
+                abs(cl.longitude - lag(cl.longitude) OVER (PARTITION BY cl.chair_id ORDER BY cl.created_at)) AS distance
+         FROM chair_locations cl
+         JOIN filtered_chairs fc ON cl.chair_id = fc.id
+     ) sub
+     WHERE distance IS NOT NULL
+     GROUP BY chair_id
+ ) dt ON dt.chair_id = c.id
 `, owner.ID); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return

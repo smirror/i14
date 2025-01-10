@@ -867,7 +867,7 @@ func appGetNearbyChairs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	distance := 50
+	distance := 30
 	if distanceStr != "" {
 		distance, err = strconv.Atoi(distanceStr)
 		if err != nil {
